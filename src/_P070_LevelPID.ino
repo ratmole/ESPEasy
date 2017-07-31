@@ -1,23 +1,43 @@
 //#######################################################################################################
-//#################################### Plugin 021: Level Control ########################################
+//#################################### Plugin 070: Level Control ########################################
 //#######################################################################################################
 
-#define PLUGIN_021
-#define PLUGIN_ID_021        21
-#define PLUGIN_NAME_021       "Level Control"
-#define PLUGIN_VALUENAME1_021 "Output"
+#include <PID_v1.h>
 
-boolean Plugin_021(byte function, struct EventStruct *event, String& string)
+#define PLUGIN_070
+#define PLUGIN_ID_070        70
+#define PLUGIN_NAME_070       "Level Control PID"
+#define PLUGIN_VALUENAME1_070 "Output"
+
+boolean Plugin_070(byte function, struct EventStruct *event, String& string)
 {
   boolean success = false;
   static byte switchstate[TASKS_MAX];
+  double Setpoint, Input, Output;
+
+  //Specify the links and initial tuning parameters
+  PID myPID(&Input, &Output, &Setpoint,2,5,1, DIRECT);
+
+  int WindowSize = 5000;
+  unsigned long windowStartTime;
+  windowStartTime = millis();
+
+  //initialize the variables we're linked to
+  Setpoint = Settings.TaskDevicePluginConfigFloat[event->TaskIndex][0];
+
+  //tell the PID to range between 0 and the full window size
+  myPID.SetOutputLimits(0, WindowSize);
+
+  //turn the PID on
+  myPID.SetMode(AUTOMATIC);
+
 
   switch (function)
   {
 
     case PLUGIN_DEVICE_ADD:
       {
-        Device[++deviceCount].Number = PLUGIN_ID_021;
+        Device[++deviceCount].Number = PLUGIN_ID_070;
         Device[deviceCount].Type = DEVICE_TYPE_SINGLE;
         Device[deviceCount].VType = SENSOR_TYPE_SWITCH;
         Device[deviceCount].Ports = 0;
@@ -32,13 +52,13 @@ boolean Plugin_021(byte function, struct EventStruct *event, String& string)
 
     case PLUGIN_GET_DEVICENAME:
       {
-        string = F(PLUGIN_NAME_021);
+        string = F(PLUGIN_NAME_070);
         break;
       }
 
     case PLUGIN_GET_DEVICEVALUENAMES:
       {
-        strcpy_P(ExtraTaskSettings.TaskDeviceValueNames[0], PSTR(PLUGIN_VALUENAME1_021));
+        strcpy_P(ExtraTaskSettings.TaskDeviceValueNames[0], PSTR(PLUGIN_VALUENAME1_070));
         break;
       }
 
@@ -47,15 +67,15 @@ boolean Plugin_021(byte function, struct EventStruct *event, String& string)
         char tmpString[128];
 
         string += F("<TR><TD>Check Task:<TD>");
-        addTaskSelect(string, "plugin_021_task", Settings.TaskDevicePluginConfig[event->TaskIndex][0]);
+        addTaskSelect(string, "plugin_070_task", Settings.TaskDevicePluginConfig[event->TaskIndex][0]);
 
         LoadTaskSettings(Settings.TaskDevicePluginConfig[event->TaskIndex][0]); // we need to load the values from another task for selection!
         string += F("<TR><TD>Check Value:<TD>");
-        addTaskValueSelect(string, "plugin_021_value", Settings.TaskDevicePluginConfig[event->TaskIndex][1], Settings.TaskDevicePluginConfig[event->TaskIndex][0]);
+        addTaskValueSelect(string, "plugin_070_value", Settings.TaskDevicePluginConfig[event->TaskIndex][1], Settings.TaskDevicePluginConfig[event->TaskIndex][0]);
 
-      	addFormTextBox(string, F("Set Value"), F("plugin_021_setvalue"), String(Settings.TaskDevicePluginConfigFloat[event->TaskIndex][0]), 8);
+      	addFormTextBox(string, F("Set Value"), F("plugin_070_setvalue"), String(Settings.TaskDevicePluginConfigFloat[event->TaskIndex][0]), 8);
 
-      	addFormTextBox(string, F("Hysteresis"), F("plugin_021_hyst"), String(Settings.TaskDevicePluginConfigFloat[event->TaskIndex][1]), 8);
+      	addFormTextBox(string, F("Hysteresis"), F("plugin_070_hyst"), String(Settings.TaskDevicePluginConfigFloat[event->TaskIndex][1]), 8);
 
         LoadTaskSettings(event->TaskIndex); // we need to restore our original taskvalues!
         success = true;
@@ -64,10 +84,10 @@ boolean Plugin_021(byte function, struct EventStruct *event, String& string)
 
     case PLUGIN_WEBFORM_SAVE:
       {
-        Settings.TaskDevicePluginConfig[event->TaskIndex][0] = getFormItemInt(F("plugin_021_task"));
-        Settings.TaskDevicePluginConfig[event->TaskIndex][1] = getFormItemInt(F("plugin_021_value"));
-        Settings.TaskDevicePluginConfigFloat[event->TaskIndex][0] = getFormItemFloat(F("plugin_021_setvalue"));
-        Settings.TaskDevicePluginConfigFloat[event->TaskIndex][1] = getFormItemFloat(F("plugin_021_hyst"));
+        Settings.TaskDevicePluginConfig[event->TaskIndex][0] = getFormItemInt(F("plugin_070_task"));
+        Settings.TaskDevicePluginConfig[event->TaskIndex][1] = getFormItemInt(F("plugin_070_value"));
+        Settings.TaskDevicePluginConfigFloat[event->TaskIndex][0] = getFormItemFloat(F("plugin_070_setvalue"));
+        Settings.TaskDevicePluginConfigFloat[event->TaskIndex][1] = getFormItemFloat(F("plugin_070_hyst"));
         success = true;
         break;
       }
@@ -139,30 +159,36 @@ boolean Plugin_021(byte function, struct EventStruct *event, String& string)
 
       }
       break;
-    case PLUGIN_TEN_PER_SECOND:
+
+    case PLUGIN_ONCE_A_SECOND:
       {
-        // we're checking a var from another task, so calculate that basevar
+      // we're checking a var from another task, so calculate that basevar
         byte TaskIndex = Settings.TaskDevicePluginConfig[event->TaskIndex][0];
         byte BaseVarIndex = TaskIndex * VARS_PER_TASK + Settings.TaskDevicePluginConfig[event->TaskIndex][1];
-        float value = UserVar[BaseVarIndex];
-        byte state = switchstate[event->TaskIndex];
-        // compare with threshold value
-        float valueLowThreshold = Settings.TaskDevicePluginConfigFloat[event->TaskIndex][0] - (Settings.TaskDevicePluginConfigFloat[event->TaskIndex][1] / 2);
-        float valueHighThreshold = Settings.TaskDevicePluginConfigFloat[event->TaskIndex][0] + (Settings.TaskDevicePluginConfigFloat[event->TaskIndex][1] / 2);
-        if (value <= valueLowThreshold)
-          state = 1;
-        if (value >= valueHighThreshold)
-          state = 0;
-        if (state != switchstate[event->TaskIndex])
-        {
-          Serial.print(F("Out : State "));
-          Serial.println(state);
-          switchstate[event->TaskIndex] = state;
-          digitalWrite(Settings.TaskDevicePin1[event->TaskIndex],state);
-          UserVar[event->BaseVarIndex] = state;
-          sendData(event);
-        }
+        //Define Variables we'll be connecting to
 
+        float value = UserVar[BaseVarIndex];
+        Input = value;
+        myPID.Compute();
+          /************************************************
+           * turn the output pin on/off based on pid output
+           ************************************************/
+          unsigned long now = millis();
+          if(now - windowStartTime>WindowSize)
+          { //time to shift the Relay Window
+            windowStartTime += WindowSize;
+          }
+          if(Output > now - windowStartTime) {
+            digitalWrite(Settings.TaskDevicePin1[event->TaskIndex],1);
+            Serial.print(F("OutPID : State "));
+            Serial.println("1");
+          }
+          else {
+          digitalWrite(Settings.TaskDevicePin1[event->TaskIndex],0);
+          Serial.print(F("OutPID : State "));
+          Serial.println("0");
+        }
+        sendData(event);
         success = true;
         break;
       }

@@ -151,7 +151,7 @@
 #define BUILD_GIT "(custom)"
 #endif
 
-#define MAX_FLASHWRITES_PER_DAY           100 // per 24 hour window
+#define MAX_FLASHWRITES_PER_DAY           100000 // per 24 hour window
 
 #define NODE_TYPE_ID_ESP_EASY_STD           1
 #define NODE_TYPE_ID_ESP_EASYM_STD         17

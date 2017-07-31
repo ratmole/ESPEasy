@@ -149,9 +149,9 @@ boolean Plugin_039(byte function, struct EventStruct *event, String& string)
         if (Plugin_039_Celsius != NAN)
         {
           UserVar[event->BaseVarIndex] = Plugin_039_Celsius;
-          String log = F("P039 : Temperature ");
-          log += UserVar[event->BaseVarIndex];
-          addLog(LOG_LEVEL_INFO, log);
+          //String log = F("P039 : Temperature ");
+          //log += UserVar[event->BaseVarIndex];
+          //addLog(LOG_LEVEL_INFO, log);
           success = true;
         }
         else
